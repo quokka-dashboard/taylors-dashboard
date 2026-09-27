@@ -278,7 +278,12 @@ main {
 
 /* IDEA BOARDS */
 
-.idea-boards-card { cursor: pointer; }
+.idea-boards-card {
+  cursor: pointer;
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
 .idea-boards-card:active { transform: scale(.98); }
 #ideaBoards { scroll-margin-top: 18px; }
 
@@ -565,11 +570,11 @@ nav {
     <p>Keep track of appointments you still need to make.</p>
   </div>
 
-  <div class="card work-card idea-boards-card" id="openIdeaBoards" role="button" tabindex="0" aria-label="Open Idea Boards">
+  <a class="card work-card idea-boards-card" id="openIdeaBoards" href="#ideaBoards" aria-label="Open Idea Boards">
     <div class="card-icon">💡</div>
     <h3>Idea Boards</h3>
     <p>Save, tag and find ideas from TikTok, Pinterest and anywhere else.</p>
-  </div>
+  </a>
 
   <div class="card food-card">
     <div class="card-icon">🛒</div>
@@ -707,19 +712,6 @@ const date = now.toLocaleDateString("en-US", {
 
 document.getElementById("today").textContent =
   date + " • Here's what's happening today.";
-
-const ideaBoardsCard = document.getElementById("openIdeaBoards");
-function openIdeaBoards() {
-  document.getElementById("ideaBoards").scrollIntoView({ behavior: "smooth", block: "start" });
-  setTimeout(() => document.getElementById("ideaSearch").focus({preventScroll:true}), 450);
-}
-ideaBoardsCard.addEventListener("click", openIdeaBoards);
-ideaBoardsCard.addEventListener("keydown", e => {
-  if (e.key === "Enter" || e.key === " ") {
-    e.preventDefault();
-    openIdeaBoards();
-  }
-});
 
 const IDEA_KEY = "taylorsDashboardIdeas";
 let ideas = JSON.parse(localStorage.getItem(IDEA_KEY) || "[]");
