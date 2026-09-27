@@ -276,6 +276,100 @@ main {
   background: #e1edf3;
 }
 
+/* IDEA BOARDS */
+
+.idea-board {
+  margin-top: 12px;
+  background: rgba(255,255,255,.88);
+  border: 1px solid rgba(216,166,183,.22);
+  border-radius: 24px;
+  padding: 18px;
+  box-shadow: 0 5px 18px rgba(60,50,55,.07);
+}
+
+.idea-tools {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.idea-search, .idea-input, .idea-select, .idea-note {
+  width: 100%;
+  border: 1px solid #e4d9de;
+  border-radius: 14px;
+  padding: 12px;
+  font: inherit;
+  color: var(--charcoal);
+  background: white;
+}
+
+.idea-add {
+  border: 0;
+  border-radius: 14px;
+  padding: 0 16px;
+  background: linear-gradient(145deg, var(--pink), var(--deep-pink));
+  color: white;
+  font-weight: 700;
+}
+
+.idea-filters {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding: 2px 0 12px;
+}
+
+.idea-filter {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: var(--blush);
+  color: var(--charcoal);
+  font-weight: 600;
+  font-size: .76rem;
+}
+
+.idea-filter.active {
+  background: var(--deep-pink);
+  color: white;
+}
+
+.idea-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.idea-card {
+  position: relative;
+  border-radius: 18px;
+  padding: 14px;
+  background: white;
+  border: 1px solid #eee5e9;
+  min-height: 120px;
+}
+
+.idea-card h4 { margin: 0 0 7px; font-size: .92rem; }
+.idea-card p { color: var(--gray); font-size: .78rem; line-height: 1.35; }
+.idea-tags { margin: 8px 0; font-size: .7rem; color: var(--deep-pink); }
+.idea-card a { color: var(--deep-pink); font-size: .78rem; font-weight: 700; text-decoration: none; }
+.idea-delete { position:absolute; top:8px; right:8px; border:0; background:none; color:#aaa; }
+.idea-empty { grid-column:1/-1; color:var(--gray); text-align:center; padding:18px 8px; font-size:.85rem; }
+
+.idea-form {
+  display: none;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin: 4px 0 14px;
+}
+
+.idea-form.show { display:grid; }
+.idea-form .wide { grid-column:1/-1; }
+.idea-save { border:0; border-radius:14px; padding:12px; background:var(--charcoal); color:white; font-weight:700; }
+.idea-random { border:0; border-radius:14px; padding:12px; background:var(--blush); color:var(--charcoal); font-weight:700; }
+
 /* QUICK ADD */
 
 .quick-grid {
@@ -468,8 +562,8 @@ nav {
 
   <div class="card work-card">
     <div class="card-icon">💡</div>
-    <h3>Projects</h3>
-    <p>Personal and work ideas waiting for their moment.</p>
+    <h3>Idea Boards</h3>
+    <p>Save, tag and find ideas from TikTok, Pinterest and anywhere else.</p>
   </div>
 
   <div class="card food-card">
@@ -497,6 +591,41 @@ nav {
   </div>
 
 </div>
+
+<h2 class="section-title">Idea Boards</h2>
+
+<section class="idea-board" id="ideaBoards">
+  <div class="idea-tools">
+    <input class="idea-search" id="ideaSearch" type="search" placeholder="Search saved ideas, tags or notes…">
+    <button class="idea-add" id="showIdeaForm">+ Save Idea</button>
+  </div>
+
+  <div class="idea-filters" id="ideaFilters">
+    <button class="idea-filter active" data-filter="All">All</button>
+    <button class="idea-filter" data-filter="Recipes">Recipes</button>
+    <button class="idea-filter" data-filter="Kids">Kids</button>
+    <button class="idea-filter" data-filter="Work">Work</button>
+    <button class="idea-filter" data-filter="Crafts">Crafts</button>
+    <button class="idea-filter" data-filter="Shopping">Shopping</button>
+    <button class="idea-filter" data-filter="Home">Home</button>
+    <button class="idea-filter" data-filter="Gifts">Gifts</button>
+  </div>
+
+  <div class="idea-form" id="ideaForm">
+    <input class="idea-input wide" id="ideaTitle" placeholder="What is it? e.g. Easy Christmas craft">
+    <input class="idea-input wide" id="ideaUrl" placeholder="Paste TikTok, Pinterest or website link">
+    <select class="idea-select" id="ideaBoard">
+      <option>Recipes</option><option>Kids</option><option>Work</option><option>Crafts</option>
+      <option>Shopping</option><option>Home</option><option>Gifts</option><option>Other</option>
+    </select>
+    <input class="idea-input" id="ideaTags" placeholder="Tags: easy, fall, kids">
+    <textarea class="idea-note wide" id="ideaNote" placeholder="Optional note"></textarea>
+    <button class="idea-save" id="saveIdea">Save Idea</button>
+    <button class="idea-random" id="randomIdea" type="button">Surprise Me ✨</button>
+  </div>
+
+  <div class="idea-grid" id="ideaGrid"></div>
+</section>
 
 <h2 class="section-title">Quick Add</h2>
 
@@ -573,6 +702,108 @@ const date = now.toLocaleDateString("en-US", {
 
 document.getElementById("today").textContent =
   date + " • Here's what's happening today.";
+
+const IDEA_KEY = "taylorsDashboardIdeas";
+let ideas = JSON.parse(localStorage.getItem(IDEA_KEY) || "[]");
+let activeIdeaFilter = "All";
+
+const ideaForm = document.getElementById("ideaForm");
+const ideaGrid = document.getElementById("ideaGrid");
+const ideaSearch = document.getElementById("ideaSearch");
+
+document.getElementById("showIdeaForm").addEventListener("click", () => {
+  ideaForm.classList.toggle("show");
+  if (ideaForm.classList.contains("show")) document.getElementById("ideaTitle").focus();
+});
+
+function saveIdeas() {
+  localStorage.setItem(IDEA_KEY, JSON.stringify(ideas));
+}
+
+function safeText(value) {
+  const d = document.createElement("div");
+  d.textContent = value || "";
+  return d.innerHTML;
+}
+
+function safeUrl(value) {
+  try {
+    const u = new URL(value);
+    return ["http:", "https:"].includes(u.protocol) ? u.href : "";
+  } catch { return ""; }
+}
+
+function renderIdeas() {
+  const q = ideaSearch.value.trim().toLowerCase();
+  const filtered = ideas.filter(i => {
+    const matchesBoard = activeIdeaFilter === "All" || i.board === activeIdeaFilter;
+    const haystack = [i.title, i.board, i.tags, i.note].join(" ").toLowerCase();
+    return matchesBoard && (!q || haystack.includes(q));
+  });
+
+  if (!filtered.length) {
+    ideaGrid.innerHTML = '<div class="idea-empty">No ideas here yet. Save something you don\'t want to lose ✨</div>';
+    return;
+  }
+
+  ideaGrid.innerHTML = filtered.map(i => {
+    const link = safeUrl(i.url);
+    return `<article class="idea-card">
+      <button class="idea-delete" data-id="${i.id}" aria-label="Delete idea">×</button>
+      <h4>${safeText(i.title)}</h4>
+      <p>${safeText(i.note)}</p>
+      <div class="idea-tags">${safeText(i.board)}${i.tags ? " • #" + safeText(i.tags).replace(/,\s*/g," #") : ""}</div>
+      ${link ? `<a href="${link}" target="_blank" rel="noopener">Open saved link ↗</a>` : ""}
+    </article>`;
+  }).join("");
+
+  document.querySelectorAll(".idea-delete").forEach(btn => btn.addEventListener("click", () => {
+    ideas = ideas.filter(i => String(i.id) !== btn.dataset.id);
+    saveIdeas();
+    renderIdeas();
+  }));
+}
+
+document.getElementById("saveIdea").addEventListener("click", () => {
+  const title = document.getElementById("ideaTitle").value.trim();
+  if (!title) return document.getElementById("ideaTitle").focus();
+
+  ideas.unshift({
+    id: Date.now(),
+    title,
+    url: document.getElementById("ideaUrl").value.trim(),
+    board: document.getElementById("ideaBoard").value,
+    tags: document.getElementById("ideaTags").value.trim(),
+    note: document.getElementById("ideaNote").value.trim()
+  });
+  saveIdeas();
+
+  ["ideaTitle","ideaUrl","ideaTags","ideaNote"].forEach(id => document.getElementById(id).value = "");
+  ideaForm.classList.remove("show");
+  activeIdeaFilter = "All";
+  document.querySelectorAll(".idea-filter").forEach(b => b.classList.toggle("active", b.dataset.filter === "All"));
+  renderIdeas();
+});
+
+document.querySelectorAll(".idea-filter").forEach(btn => btn.addEventListener("click", () => {
+  activeIdeaFilter = btn.dataset.filter;
+  document.querySelectorAll(".idea-filter").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderIdeas();
+}));
+
+ideaSearch.addEventListener("input", renderIdeas);
+
+document.getElementById("randomIdea").addEventListener("click", () => {
+  if (!ideas.length) return;
+  const pick = ideas[Math.floor(Math.random() * ideas.length)];
+  ideaSearch.value = pick.title;
+  activeIdeaFilter = "All";
+  document.querySelectorAll(".idea-filter").forEach(b => b.classList.toggle("active", b.dataset.filter === "All"));
+  renderIdeas();
+});
+
+renderIdeas();
 </script>
 
 </body>
