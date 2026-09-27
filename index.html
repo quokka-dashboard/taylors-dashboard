@@ -278,6 +278,11 @@ main {
 
 /* IDEA BOARDS */
 
+.idea-boards-card { cursor: pointer; }
+.idea-boards-card:active { transform: scale(.98); }
+#ideaBoards { scroll-margin-top: 18px; }
+
+
 .idea-board {
   margin-top: 12px;
   background: rgba(255,255,255,.88);
@@ -560,7 +565,7 @@ nav {
     <p>Keep track of appointments you still need to make.</p>
   </div>
 
-  <div class="card work-card">
+  <div class="card work-card idea-boards-card" id="openIdeaBoards" role="button" tabindex="0" aria-label="Open Idea Boards">
     <div class="card-icon">💡</div>
     <h3>Idea Boards</h3>
     <p>Save, tag and find ideas from TikTok, Pinterest and anywhere else.</p>
@@ -702,6 +707,19 @@ const date = now.toLocaleDateString("en-US", {
 
 document.getElementById("today").textContent =
   date + " • Here's what's happening today.";
+
+const ideaBoardsCard = document.getElementById("openIdeaBoards");
+function openIdeaBoards() {
+  document.getElementById("ideaBoards").scrollIntoView({ behavior: "smooth", block: "start" });
+  setTimeout(() => document.getElementById("ideaSearch").focus({preventScroll:true}), 450);
+}
+ideaBoardsCard.addEventListener("click", openIdeaBoards);
+ideaBoardsCard.addEventListener("keydown", e => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    openIdeaBoards();
+  }
+});
 
 const IDEA_KEY = "taylorsDashboardIdeas";
 let ideas = JSON.parse(localStorage.getItem(IDEA_KEY) || "[]");
