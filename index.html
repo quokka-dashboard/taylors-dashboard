@@ -279,6 +279,79 @@ main {
   background: #e1edf3;
 }
 
+/* DAILY CHECKLIST */
+
+.clickable-card { cursor:pointer; }
+.clickable-card:active { transform:scale(.98); }
+
+.task-panel {
+  display:none;
+  margin-top:14px;
+  background:rgba(255,255,255,.92);
+  border:1px solid rgba(216,166,183,.22);
+  border-radius:24px;
+  padding:18px;
+  box-shadow:0 5px 18px rgba(60,50,55,.07);
+}
+.task-panel.show { display:block; }
+.task-panel h3 { margin-bottom:4px; }
+.task-panel-sub { color:var(--gray); font-size:.82rem; margin-bottom:14px; }
+
+.task-add-row {
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:8px;
+}
+.task-input {
+  width:100%;
+  border:1px solid #e4d9de;
+  border-radius:14px;
+  padding:12px;
+  font:inherit;
+  color:var(--charcoal);
+  background:white;
+}
+.task-add-btn {
+  border:0;
+  border-radius:14px;
+  padding:0 16px;
+  background:linear-gradient(145deg,var(--pink),var(--deep-pink));
+  color:white;
+  font-weight:700;
+}
+.repeat-row {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 3px 4px;
+  color:var(--gray);
+  font-size:.8rem;
+}
+.task-list { margin-top:10px; display:grid; gap:8px; }
+.task-item {
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  gap:10px;
+  align-items:center;
+  background:white;
+  border:1px solid #eee5e9;
+  border-radius:15px;
+  padding:11px 12px;
+}
+.task-item.done .task-text { text-decoration:line-through; color:#aaa; }
+.task-check { width:20px; height:20px; accent-color:var(--deep-pink); }
+.task-text { font-size:.88rem; }
+.task-repeat { font-size:.68rem; color:var(--deep-pink); margin-top:2px; }
+.task-delete {
+  border:0;
+  background:none;
+  color:#aaa;
+  font-size:1.15rem;
+  padding:4px;
+}
+.task-empty { color:var(--gray); text-align:center; padding:12px; font-size:.82rem; }
+.done-label { margin-top:16px; font-size:.74rem; letter-spacing:1px; color:var(--gray); text-transform:uppercase; }
+
 /* IDEA BOARDS */
 
 .idea-boards-card {
@@ -528,7 +601,7 @@ nav {
 
 <div class="grid">
 
-  <div class="card">
+  <div class="card clickable-card" id="openChecklist" role="button" tabindex="0" aria-label="Open Daily Checklist">
     <div class="card-icon">✨</div>
     <h3>Daily Checklist</h3>
     <p>Today's little things, all in one place.</p>
@@ -553,6 +626,24 @@ nav {
   </div>
 
 </div>
+
+<section class="task-panel" id="checklistPanel">
+  <h3>✨ Daily Checklist</h3>
+  <p class="task-panel-sub">Keep it simple. Unfinished things stay until they're done.</p>
+
+  <div class="task-add-row">
+    <input class="task-input" id="taskInput" placeholder="What do you need to do?">
+    <button class="task-add-btn" id="addTask">Add</button>
+  </div>
+  <label class="repeat-row">
+    <input type="checkbox" id="taskRepeat">
+    Repeat every day
+  </label>
+
+  <div class="task-list" id="activeTasks"></div>
+  <div class="done-label" id="doneLabel">Done today ✓</div>
+  <div class="task-list" id="doneTasks"></div>
+</section>
 
 <h2 class="section-title">My Life</h2>
 
@@ -647,7 +738,7 @@ nav {
 
 <div class="quick-grid">
 
-  <button class="quick-button">
+  <button class="quick-button" id="quickTask">
     <span>✓</span>
     Task
   </button>
@@ -718,6 +809,92 @@ const date = now.toLocaleDateString("en-US", {
 
 document.getElementById("today").textContent =
   date + " • Here's what's happening today.";
+
+const TASK_KEY = "taylorsDashboardTasks";
+let tasks = JSON.parse(localStorage.getItem(TASK_KEY) || "[]");
+const todayKey = new Date().toISOString().slice(0,10);
+
+function saveTasks() {
+  localStorage.setItem(TASK_KEY, JSON.stringify(tasks));
+}
+
+function normalizeDailyTasks() {
+  tasks.forEach(t => {
+    if (t.repeat && t.completedDate && t.completedDate !== todayKey) {
+      t.done = false;
+      t.completedDate = "";
+    }
+  });
+  saveTasks();
+}
+
+function renderTasks() {
+  normalizeDailyTasks();
+  const active = tasks.filter(t => !t.done);
+  const done = tasks.filter(t => t.done && t.completedDate === todayKey);
+
+  const row = t => `<div class="task-item ${t.done ? "done" : ""}">
+    <input class="task-check" type="checkbox" data-check="${t.id}" ${t.done ? "checked" : ""}>
+    <div><div class="task-text">${safeText(t.text)}</div>${t.repeat ? '<div class="task-repeat">↻ Every day</div>' : ''}</div>
+    <button class="task-delete" data-task-delete="${t.id}" aria-label="Delete task">×</button>
+  </div>`;
+
+  document.getElementById("activeTasks").innerHTML =
+    active.length ? active.map(row).join("") : '<div class="task-empty">Nothing waiting. ✨</div>';
+  document.getElementById("doneTasks").innerHTML =
+    done.length ? done.map(row).join("") : '<div class="task-empty">Completed tasks will show here.</div>';
+
+  document.querySelectorAll("[data-check]").forEach(box => box.addEventListener("change", () => {
+    const t = tasks.find(x => String(x.id) === box.dataset.check);
+    if (!t) return;
+    t.done = box.checked;
+    t.completedDate = box.checked ? todayKey : "";
+    saveTasks();
+    renderTasks();
+  }));
+
+  document.querySelectorAll("[data-task-delete]").forEach(btn => btn.addEventListener("click", () => {
+    tasks = tasks.filter(t => String(t.id) !== btn.dataset.taskDelete);
+    saveTasks();
+    renderTasks();
+  }));
+}
+
+function addTaskFromInput() {
+  const input = document.getElementById("taskInput");
+  const text = input.value.trim();
+  if (!text) return input.focus();
+  tasks.unshift({
+    id: Date.now(),
+    text,
+    repeat: document.getElementById("taskRepeat").checked,
+    done:false,
+    completedDate:""
+  });
+  saveTasks();
+  input.value = "";
+  document.getElementById("taskRepeat").checked = false;
+  renderTasks();
+  input.focus();
+}
+
+function openChecklist(focusInput=false) {
+  const panel = document.getElementById("checklistPanel");
+  panel.classList.add("show");
+  renderTasks();
+  panel.scrollIntoView({behavior:"smooth",block:"start"});
+  if (focusInput) setTimeout(() => document.getElementById("taskInput").focus(), 350);
+}
+
+document.getElementById("openChecklist").addEventListener("click", () => openChecklist(false));
+document.getElementById("openChecklist").addEventListener("keydown", e => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openChecklist(false); }
+});
+document.getElementById("addTask").addEventListener("click", addTaskFromInput);
+document.getElementById("taskInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") addTaskFromInput();
+});
+document.getElementById("quickTask").addEventListener("click", () => openChecklist(true));
 
 const IDEA_KEY = "taylorsDashboardIdeas";
 let ideas = JSON.parse(localStorage.getItem(IDEA_KEY) || "[]");
@@ -820,6 +997,7 @@ document.getElementById("randomIdea").addEventListener("click", () => {
 });
 
 renderIdeas();
+renderTasks();
 </script>
 
 </body>
