@@ -352,6 +352,23 @@ main {
 .task-empty { color:var(--gray); text-align:center; padding:12px; font-size:.82rem; }
 .done-label { margin-top:16px; font-size:.74rem; letter-spacing:1px; color:var(--gray); text-transform:uppercase; }
 
+/* MY DAY */
+.day-panel {
+  display:none; margin-top:14px; background:rgba(255,255,255,.92);
+  border:1px solid rgba(216,166,183,.22); border-radius:24px; padding:18px;
+  box-shadow:0 5px 18px rgba(60,50,55,.07);
+}
+.day-panel.show { display:block; }
+.day-panel h3 { margin-bottom:4px; }
+.day-form { display:grid; grid-template-columns:110px 1fr auto; gap:8px; margin-top:14px; }
+.day-input { width:100%; border:1px solid #e4d9de; border-radius:14px; padding:12px; font:inherit; background:white; color:var(--charcoal); }
+.day-list { display:grid; gap:8px; margin-top:14px; }
+.day-item { display:grid; grid-template-columns:72px 1fr auto; gap:10px; align-items:center; background:white; border:1px solid #eee5e9; border-radius:15px; padding:11px 12px; }
+.day-time { font-weight:700; color:var(--deep-pink); font-size:.82rem; }
+.day-event { font-size:.88rem; }
+.day-delete { border:0; background:none; color:#aaa; font-size:1.15rem; padding:4px; }
+@media (max-width:520px) { .day-form { grid-template-columns:1fr auto; } .day-form input[type="time"] { grid-column:1/-1; } }
+
 /* IDEA BOARDS */
 
 .idea-boards-card {
@@ -607,7 +624,7 @@ nav {
     <p>Today's little things, all in one place.</p>
   </div>
 
-  <div class="card">
+  <div class="card clickable-card" id="openMyDay" role="button" tabindex="0" aria-label="Open My Day">
     <div class="card-icon">🕐</div>
     <h3>My Day</h3>
     <p>Your schedule and what's coming next.</p>
@@ -643,6 +660,17 @@ nav {
   <div class="task-list" id="activeTasks"></div>
   <div class="done-label" id="doneLabel">Done today ✓</div>
   <div class="task-list" id="doneTasks"></div>
+</section>
+
+<section class="day-panel" id="myDayPanel">
+  <h3>🕐 My Day</h3>
+  <p class="task-panel-sub">Just today's plans, in time order.</p>
+  <div class="day-form">
+    <input class="day-input" id="dayTime" type="time" aria-label="Time">
+    <input class="day-input" id="dayEvent" placeholder="What's happening?">
+    <button class="task-add-btn" id="addDayEvent">Add</button>
+  </div>
+  <div class="day-list" id="dayList"></div>
 </section>
 
 <h2 class="section-title">My Life</h2>
@@ -753,7 +781,7 @@ nav {
     Shopping
   </button>
 
-  <button class="quick-button">
+  <button class="quick-button" id="quickAppointment">
     <span>📅</span>
     Appointment
   </button>
@@ -896,6 +924,43 @@ document.getElementById("taskInput").addEventListener("keydown", e => {
 });
 document.getElementById("quickTask").addEventListener("click", () => openChecklist(true));
 
+const DAY_KEY = "taylorsDashboardDayEvents";
+let dayEvents = JSON.parse(localStorage.getItem(DAY_KEY) || "[]");
+
+function saveDayEvents() { localStorage.setItem(DAY_KEY, JSON.stringify(dayEvents)); }
+function formatDayTime(t) {
+  if (!t) return "Anytime";
+  const [h,m] = t.split(":").map(Number);
+  return new Date(2000,0,1,h,m).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+}
+function renderDay() {
+  const todays = dayEvents.filter(e => e.date === todayKey).sort((a,b) => (a.time || "99:99").localeCompare(b.time || "99:99"));
+  document.getElementById("dayList").innerHTML = todays.length ? todays.map(e => `<div class="day-item">
+    <div class="day-time">${formatDayTime(e.time)}</div>
+    <div class="day-event">${safeText(e.text)}</div>
+    <button class="day-delete" data-day-delete="${e.id}" aria-label="Delete appointment">×</button>
+  </div>`).join("") : '<div class="task-empty">Nothing scheduled yet. ✨</div>';
+  document.querySelectorAll("[data-day-delete]").forEach(btn => btn.addEventListener("click", () => {
+    dayEvents = dayEvents.filter(e => String(e.id) !== btn.dataset.dayDelete); saveDayEvents(); renderDay();
+  }));
+}
+function addDayEvent() {
+  const input=document.getElementById("dayEvent"), text=input.value.trim();
+  if (!text) return input.focus();
+  dayEvents.push({id:Date.now(),date:todayKey,time:document.getElementById("dayTime").value,text});
+  saveDayEvents(); input.value=""; document.getElementById("dayTime").value=""; renderDay(); input.focus();
+}
+function openMyDay(focus=false) {
+  const panel=document.getElementById("myDayPanel"); panel.classList.add("show"); renderDay();
+  panel.scrollIntoView({behavior:"smooth",block:"start"});
+  if (focus) setTimeout(()=>document.getElementById("dayTime").focus(),350);
+}
+document.getElementById("openMyDay").addEventListener("click",()=>openMyDay(false));
+document.getElementById("openMyDay").addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();openMyDay(false);} });
+document.getElementById("addDayEvent").addEventListener("click",addDayEvent);
+document.getElementById("dayEvent").addEventListener("keydown",e=>{if(e.key==="Enter")addDayEvent();});
+document.getElementById("quickAppointment").addEventListener("click",()=>openMyDay(true));
+
 const IDEA_KEY = "taylorsDashboardIdeas";
 let ideas = JSON.parse(localStorage.getItem(IDEA_KEY) || "[]");
 let activeIdeaFilter = "All";
@@ -998,6 +1063,7 @@ document.getElementById("randomIdea").addEventListener("click", () => {
 
 renderIdeas();
 renderTasks();
+renderDay();
 </script>
 
 </body>
