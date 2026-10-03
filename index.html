@@ -894,7 +894,7 @@ function renderMeds(){
   document.querySelectorAll("[data-med-delete]").forEach(b=>b.onclick=()=>{meds=meds.filter(x=>String(x.id)!==b.dataset.medDelete);saveMeds();renderMeds();});
 }
 function addMed(){const n=document.getElementById("medName"),h=document.getElementById("medHours");const name=n.value.trim(),hours=Number(h.value);if(!name)return n.focus();if(!hours||hours<=0)return h.focus();meds.push({id:Date.now(),name,hours,logs:[]});saveMeds();n.value="";h.value="";renderMeds();}
-function openMeds(){const p=document.getElementById("medPanel");p.classList.add("show");renderMeds();p.scrollIntoView({behavior:"smooth",block:"start"});}
+function openMeds(){const p=document.getElementById("medPanel"),wasOpen=p.classList.contains("show");closeTodayPanels();if(wasOpen){p.classList.remove("show");return;}p.classList.add("show");renderMeds();p.scrollIntoView({behavior:"smooth",block:"start"});}
 document.getElementById("openMedTimes").addEventListener("click",openMeds);
 document.getElementById("openMedTimes").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openMeds();}});
 document.getElementById("addMed").addEventListener("click",addMed);
@@ -967,8 +967,16 @@ function addTaskFromInput() {
   input.focus();
 }
 
+function closeTodayPanels(exceptId="") {
+  ["checklistPanel","myDayPanel","medPanel"].forEach(id => {
+    if (id !== exceptId) document.getElementById(id)?.classList.remove("show");
+  });
+}
 function openChecklist(focusInput=false) {
   const panel = document.getElementById("checklistPanel");
+  const wasOpen = panel.classList.contains("show");
+  closeTodayPanels();
+  if (wasOpen && !focusInput) { panel.classList.remove("show"); return; }
   panel.classList.add("show");
   renderTasks();
   panel.scrollIntoView({behavior:"smooth",block:"start"});
@@ -1012,7 +1020,10 @@ function addDayEvent() {
   saveDayEvents(); input.value=""; document.getElementById("dayTime").value=""; renderDay(); input.focus();
 }
 function openMyDay(focus=false) {
-  const panel=document.getElementById("myDayPanel"); panel.classList.add("show"); renderDay();
+  const panel=document.getElementById("myDayPanel"), wasOpen=panel.classList.contains("show");
+  closeTodayPanels();
+  if(wasOpen && !focus){panel.classList.remove("show");return;}
+  panel.classList.add("show"); renderDay();
   panel.scrollIntoView({behavior:"smooth",block:"start"});
   if (focus) setTimeout(()=>document.getElementById("dayTime").focus(),350);
 }
