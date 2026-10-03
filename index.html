@@ -352,6 +352,18 @@ main {
 .task-empty { color:var(--gray); text-align:center; padding:12px; font-size:.82rem; }
 .done-label { margin-top:16px; font-size:.74rem; letter-spacing:1px; color:var(--gray); text-transform:uppercase; }
 
+/* WORK MEAL */
+.meal-panel { display:none; margin-top:14px; background:rgba(255,255,255,.92); border:1px solid rgba(216,166,183,.22); border-radius:24px; padding:18px; box-shadow:0 5px 18px rgba(60,50,55,.07); }
+.meal-panel.show { display:block; }
+.week-nav { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:10px; margin:14px 0; }
+.week-nav button { border:0; border-radius:12px; background:var(--blush); padding:9px 12px; font-weight:700; color:var(--charcoal); }
+.week-label { text-align:center; font-size:.82rem; font-weight:700; }
+.meal-days { display:grid; gap:8px; }
+.meal-day { display:grid; grid-template-columns:88px 1fr; gap:8px; align-items:center; }
+.meal-day label { font-size:.82rem; font-weight:700; color:var(--deep-pink); }
+.meal-day.today { background:var(--blush); border-radius:15px; padding:8px; }
+.meal-save { margin-top:12px; width:100%; min-height:42px; }
+
 /* MED TIMES */
 .med-panel { display:none; margin-top:14px; background:rgba(255,255,255,.92); border:1px solid rgba(216,166,183,.22); border-radius:24px; padding:18px; box-shadow:0 5px 18px rgba(60,50,55,.07); }
 .med-panel.show { display:block; }
@@ -653,13 +665,25 @@ nav {
     <p>Log as-needed meds and see the next time.</p>
   </div>
 
-  <div class="card food-card">
+  <div class="card food-card clickable-card" id="openWorkMeal" role="button" tabindex="0" aria-label="Open Work Meal">
     <div class="card-icon">🍴</div>
     <h3>Work Meal</h3>
-    <p>Today's planned work meal.</p>
+    <p id="todayWorkMeal">Today's planned work meal.</p>
   </div>
 
 </div>
+
+<section class="meal-panel" id="mealPanel">
+  <div style="display:flex;justify-content:space-between;align-items:center"><h3>🍴 Work Meal</h3><button class="day-delete today-close" type="button" aria-label="Close">×</button></div>
+  <p class="task-panel-sub">Plan the work week. No recipes, no fuss.</p>
+  <div class="week-nav">
+    <button id="prevMealWeek" type="button">‹</button>
+    <div class="week-label" id="mealWeekLabel"></div>
+    <button id="nextMealWeek" type="button">›</button>
+  </div>
+  <div class="meal-days" id="mealDays"></div>
+  <button class="task-add-btn meal-save" id="saveMeals" type="button">Save Week</button>
+</section>
 
 <section class="med-panel" id="medPanel">
   <div style="display:flex;justify-content:space-between;align-items:center"><h3>💊 Med Times</h3><button class="day-delete today-close" type="button" aria-label="Close">×</button></div>
@@ -870,6 +894,36 @@ const date = now.toLocaleDateString("en-US", {
 document.getElementById("today").textContent =
   date + " • Here's what's happening today.";
 
+const MEAL_KEY = "taylorsDashboardWorkMeals";
+let workMeals = JSON.parse(localStorage.getItem(MEAL_KEY) || "{}");
+let mealWeekOffset = 0;
+function mondayOfWeek(offset=0){
+  const d=new Date(); d.setHours(12,0,0,0);
+  const day=d.getDay(), diff=(day===0?-6:1-day);
+  d.setDate(d.getDate()+diff+(offset*7)); return d;
+}
+function dateKeyFrom(d){ return localDateKey(d); }
+function renderMealWeek(){
+  const monday=mondayOfWeek(mealWeekOffset), friday=new Date(monday); friday.setDate(monday.getDate()+4);
+  document.getElementById("mealWeekLabel").textContent = monday.toLocaleDateString("en-US",{month:"short",day:"numeric"})+" – "+friday.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+  const names=["Monday","Tuesday","Wednesday","Thursday","Friday"], today=localDateKey();
+  document.getElementById("mealDays").innerHTML=names.map((name,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);const key=dateKeyFrom(d);return `<div class="meal-day ${key===today?"today":""}"><label>${name}</label><input class="day-input meal-entry" data-meal-date="${key}" value="${safeText(workMeals[key]||"")}" placeholder="What's for work?"></div>`;}).join("");
+}
+function saveMealWeek(){
+  document.querySelectorAll(".meal-entry").forEach(i=>{const v=i.value.trim();if(v)workMeals[i.dataset.mealDate]=v;else delete workMeals[i.dataset.mealDate];});
+  localStorage.setItem(MEAL_KEY,JSON.stringify(workMeals)); updateTodayMeal(); renderMealWeek();
+}
+function updateTodayMeal(){const meal=workMeals[localDateKey()];document.getElementById("todayWorkMeal").textContent=meal?meal:"Today's planned work meal.";}
+function openWorkMeal(){
+  const p=document.getElementById("mealPanel"),wasOpen=p.classList.contains("show");closeTodayPanels();
+  if(wasOpen){p.classList.remove("show");return;} p.classList.add("show");renderMealWeek();p.scrollIntoView({behavior:"smooth",block:"start"});
+}
+document.getElementById("openWorkMeal").addEventListener("click",openWorkMeal);
+document.getElementById("openWorkMeal").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openWorkMeal();}});
+document.getElementById("prevMealWeek").onclick=()=>{mealWeekOffset--;renderMealWeek();};
+document.getElementById("nextMealWeek").onclick=()=>{mealWeekOffset++;renderMealWeek();};
+document.getElementById("saveMeals").onclick=saveMealWeek;
+
 const MED_KEY = "taylorsDashboardMeds";
 let meds = JSON.parse(localStorage.getItem(MED_KEY) || "[]");
 function saveMeds(){ localStorage.setItem(MED_KEY,JSON.stringify(meds)); }
@@ -889,7 +943,8 @@ function renderMeds(){
   meds.forEach(m=>(m.logs||[]).forEach(t=>{if(localDateKey(new Date(t))===localDateKey())logs.push({name:m.name,t});}));
   logs.sort((a,b)=>b.t-a.t);
   document.getElementById("medHistory").innerHTML=logs.length?logs.map(x=>`<div class="med-history-item">${clockTime(x.t)} — ${safeText(x.name)}</div>`).join(""):'<div class="task-empty">Nothing logged today.</div>';
-  document.querySelectorAll("[data-med-now]").forEach(b=>b.onclick=()=>{const m=meds.find(x=>String(x.id)===b.dataset.medNow);if(m){m.logs=m.logs||[];m.logs.push(Date.now());saveMeds();renderMeds();}});
+  document.querySelectorAll("[data-med-now]").forEach(b=>b.onclick=()=>{const m=meds.find(x=>String(x.id)===b.dataset.medNow);if(m){m.logs=m.logs||[];m.logs.push(Date.now());saveMeds();renderMeds();
+updateTodayMeal();}});
   document.querySelectorAll("[data-med-time]").forEach(b=>b.onclick=()=>{const m=meds.find(x=>String(x.id)===b.dataset.medTime);if(!m)return;const v=prompt("What time was it taken? Example: 2:15 PM");if(!v)return;const parsed=new Date(localDateKey()+" "+v);if(isNaN(parsed))return alert("I couldn't read that time. Try something like 2:15 PM.");m.logs=m.logs||[];m.logs.push(parsed.getTime());m.logs.sort((a,b)=>a-b);saveMeds();renderMeds();});
   document.querySelectorAll("[data-med-delete]").forEach(b=>b.onclick=()=>{meds=meds.filter(x=>String(x.id)!==b.dataset.medDelete);saveMeds();renderMeds();});
 }
@@ -968,7 +1023,7 @@ function addTaskFromInput() {
 }
 
 function closeTodayPanels(exceptId="") {
-  document.querySelectorAll("#checklistPanel, #myDayPanel, #medPanel").forEach(panel => {
+  document.querySelectorAll("#checklistPanel, #myDayPanel, #medPanel, #mealPanel").forEach(panel => {
     if (panel.id !== exceptId) panel.classList.remove("show");
   });
 }
@@ -1134,7 +1189,7 @@ document.getElementById("randomIdea").addEventListener("click", () => {
 });
 
 document.querySelectorAll(".today-close").forEach(btn => btn.addEventListener("click", () => {
-  btn.closest("#checklistPanel, #myDayPanel, #medPanel")?.classList.remove("show");
+  btn.closest("#checklistPanel, #myDayPanel, #medPanel, #mealPanel")?.classList.remove("show");
 }));
 renderIdeas();
 renderTasks();
