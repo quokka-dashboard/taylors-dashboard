@@ -939,12 +939,13 @@ async function pushCloud(){
  if(!cloudReady||!cloudUser||applyingCloud)return;
  setSyncStatus("☁️ Syncing…");
  const {error}=await supabaseClient.from("dashboard_data").upsert({user_id:cloudUser.id,data:collectCloudData(),updated_at:new Date().toISOString()});
- setSyncStatus(error?"⚠️ Sync problem":"☁️ Synced");
+ if(error){console.error("Taylor sync push error:",error);setSyncStatus("⚠️ Sync problem");}
+ else setSyncStatus("☁️ Synced");
 }
 function queueCloudSync(){if(!cloudReady||applyingCloud)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(pushCloud,350);}
 async function loadCloud(){
  const {data,error}=await supabaseClient.from("dashboard_data").select("data").eq("user_id",cloudUser.id).maybeSingle();
- if(error){setSyncStatus("⚠️ Sync problem");return;}
+ if(error){console.error("Taylor sync load error:",error);setSyncStatus("⚠️ Sync problem");return;}
  if(data?.data){
    applyingCloud=true;
    CLOUD_KEYS.forEach(k=>{if(data.data[k]!==undefined&&data.data[k]!==null)localStorage.setItem(k,JSON.stringify(data.data[k]));});
@@ -953,7 +954,7 @@ async function loadCloud(){
  } else {cloudReady=true;await pushCloud();}
  cloudReady=true;setSyncStatus("☁️ Synced");
 }
-async function startCloud(user){cloudUser=user;document.getElementById("authOverlay").classList.add("hidden");await loadCloud();}
+async function startCloud(user){cloudUser=user;cloudReady=true;document.getElementById("authOverlay").classList.add("hidden");await loadCloud();}
 document.getElementById("authSignIn").onclick=async()=>{
  const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;
  document.getElementById("authError").textContent="";
