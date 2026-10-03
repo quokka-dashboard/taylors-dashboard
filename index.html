@@ -352,6 +352,23 @@ main {
 .task-empty { color:var(--gray); text-align:center; padding:12px; font-size:.82rem; }
 .done-label { margin-top:16px; font-size:.74rem; letter-spacing:1px; color:var(--gray); text-transform:uppercase; }
 
+/* MED TIMES */
+.med-panel { display:none; margin-top:14px; background:rgba(255,255,255,.92); border:1px solid rgba(216,166,183,.22); border-radius:24px; padding:18px; box-shadow:0 5px 18px rgba(60,50,55,.07); }
+.med-panel.show { display:block; }
+.med-setup { display:grid; grid-template-columns:1fr 110px auto; gap:8px; margin:14px 0; }
+.med-card { background:white; border:1px solid #eee5e9; border-radius:18px; padding:14px; margin-top:10px; }
+.med-head { display:flex; justify-content:space-between; gap:10px; align-items:start; }
+.med-name { font-weight:700; }
+.med-next { margin-top:8px; font-size:.9rem; }
+.med-next strong { color:var(--deep-pink); }
+.med-note { color:var(--gray); font-size:.7rem; margin-top:3px; }
+.med-actions { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+.med-btn { border:0; border-radius:12px; padding:9px 12px; background:var(--blush); color:var(--charcoal); font-weight:700; }
+.med-btn.primary { background:linear-gradient(145deg,var(--pink),var(--deep-pink)); color:white; }
+.med-history { margin-top:14px; }
+.med-history-item { font-size:.8rem; color:var(--gray); padding:6px 2px; border-bottom:1px solid #f1eaed; }
+@media (max-width:520px) { .med-setup { grid-template-columns:1fr auto; } .med-setup .med-name-input { grid-column:1/-1; } }
+
 /* MY DAY */
 .day-panel {
   display:none; margin-top:14px; background:rgba(255,255,255,.92);
@@ -630,10 +647,10 @@ nav {
     <p>Your schedule and what's coming next.</p>
   </div>
 
-  <div class="card health-card">
+  <div class="card health-card clickable-card" id="openMedTimes" role="button" tabindex="0" aria-label="Open Med Times">
     <div class="card-icon">💊</div>
     <h3>Med Times</h3>
-    <p>Keep medication times easy to find.</p>
+    <p>Log as-needed meds and see the next time.</p>
   </div>
 
   <div class="card food-card">
@@ -643,6 +660,21 @@ nav {
   </div>
 
 </div>
+
+<section class="med-panel" id="medPanel">
+  <h3>💊 Med Times</h3>
+  <p class="task-panel-sub">Log as-needed medication times using the interval you enter.</p>
+  <div class="med-setup">
+    <input class="day-input med-name-input" id="medName" placeholder="Medication name">
+    <input class="day-input" id="medHours" type="number" min="0.5" step="0.5" placeholder="Hours">
+    <button class="task-add-btn" id="addMed">Add</button>
+  </div>
+  <div id="medList"></div>
+  <div class="med-history">
+    <div class="done-label">Today's history</div>
+    <div id="medHistory"></div>
+  </div>
+</section>
 
 <section class="task-panel" id="checklistPanel">
   <h3>✨ Daily Checklist</h3>
@@ -838,9 +870,38 @@ const date = now.toLocaleDateString("en-US", {
 document.getElementById("today").textContent =
   date + " • Here's what's happening today.";
 
+const MED_KEY = "taylorsDashboardMeds";
+let meds = JSON.parse(localStorage.getItem(MED_KEY) || "[]");
+function saveMeds(){ localStorage.setItem(MED_KEY,JSON.stringify(meds)); }
+function localDateKey(d=new Date()){ const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; }
+function clockTime(ms){ return new Date(ms).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}); }
+function renderMeds(){
+  const list=document.getElementById("medList");
+  list.innerHTML=meds.length?meds.map(m=>{
+    const last=m.logs?.length?m.logs[m.logs.length-1]:null;
+    const next=last?last+(Number(m.hours)*3600000):null;
+    return `<div class="med-card"><div class="med-head"><div><div class="med-name">${safeText(m.name)}</div><div class="med-note">Every ${safeText(String(m.hours))} hours as needed</div></div><button class="day-delete" data-med-delete="${m.id}" aria-label="Delete medication">×</button></div>
+      <div class="med-next">${last?`Last taken: <strong>${clockTime(last)}</strong><br>Next time: <strong>${clockTime(next)}</strong>`:"Not logged yet."}</div>
+      <div class="med-note">${last?"Based on the interval you entered.":""}</div>
+      <div class="med-actions"><button class="med-btn primary" data-med-now="${m.id}">Taken Now</button><button class="med-btn" data-med-time="${m.id}">Enter Time</button></div></div>`;
+  }).join(""):'<div class="task-empty">No as-needed medications added yet.</div>';
+  const logs=[];
+  meds.forEach(m=>(m.logs||[]).forEach(t=>{if(localDateKey(new Date(t))===localDateKey())logs.push({name:m.name,t});}));
+  logs.sort((a,b)=>b.t-a.t);
+  document.getElementById("medHistory").innerHTML=logs.length?logs.map(x=>`<div class="med-history-item">${clockTime(x.t)} — ${safeText(x.name)}</div>`).join(""):'<div class="task-empty">Nothing logged today.</div>';
+  document.querySelectorAll("[data-med-now]").forEach(b=>b.onclick=()=>{const m=meds.find(x=>String(x.id)===b.dataset.medNow);if(m){m.logs=m.logs||[];m.logs.push(Date.now());saveMeds();renderMeds();}});
+  document.querySelectorAll("[data-med-time]").forEach(b=>b.onclick=()=>{const m=meds.find(x=>String(x.id)===b.dataset.medTime);if(!m)return;const v=prompt("What time was it taken? Example: 2:15 PM");if(!v)return;const parsed=new Date(localDateKey()+" "+v);if(isNaN(parsed))return alert("I couldn't read that time. Try something like 2:15 PM.");m.logs=m.logs||[];m.logs.push(parsed.getTime());m.logs.sort((a,b)=>a-b);saveMeds();renderMeds();});
+  document.querySelectorAll("[data-med-delete]").forEach(b=>b.onclick=()=>{meds=meds.filter(x=>String(x.id)!==b.dataset.medDelete);saveMeds();renderMeds();});
+}
+function addMed(){const n=document.getElementById("medName"),h=document.getElementById("medHours");const name=n.value.trim(),hours=Number(h.value);if(!name)return n.focus();if(!hours||hours<=0)return h.focus();meds.push({id:Date.now(),name,hours,logs:[]});saveMeds();n.value="";h.value="";renderMeds();}
+function openMeds(){const p=document.getElementById("medPanel");p.classList.add("show");renderMeds();p.scrollIntoView({behavior:"smooth",block:"start"});}
+document.getElementById("openMedTimes").addEventListener("click",openMeds);
+document.getElementById("openMedTimes").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openMeds();}});
+document.getElementById("addMed").addEventListener("click",addMed);
+
 const TASK_KEY = "taylorsDashboardTasks";
 let tasks = JSON.parse(localStorage.getItem(TASK_KEY) || "[]");
-const todayKey = new Date().toISOString().slice(0,10);
+const todayKey = localDateKey();
 
 function saveTasks() {
   localStorage.setItem(TASK_KEY, JSON.stringify(tasks));
@@ -1064,6 +1125,7 @@ document.getElementById("randomIdea").addEventListener("click", () => {
 renderIdeas();
 renderTasks();
 renderDay();
+renderMeds();
 </script>
 
 </body>
