@@ -628,6 +628,7 @@ nav {
     grid-template-columns: repeat(6, 1fr);
   }
 }
+.sync-bar{max-width:1100px;margin:12px auto 0;padding:0 18px;display:flex;justify-content:flex-end}.sync-btn{border:0;border-radius:999px;padding:9px 14px;background:white;color:var(--deep-pink);font-weight:700;box-shadow:0 3px 12px rgba(60,50,55,.08)}.auth-overlay{position:fixed;inset:0;background:rgba(247,232,237,.96);z-index:9999;display:flex;align-items:center;justify-content:center;padding:22px}.auth-overlay.hidden{display:none}.auth-card{width:min(420px,100%);background:white;border-radius:26px;padding:25px;box-shadow:0 15px 45px rgba(69,65,73,.18);text-align:center}.auth-card h2{font-family:"Berkshire Swash",cursive;color:var(--deep-pink);font-size:2rem;margin-bottom:8px}.auth-card p{color:var(--gray);font-size:.86rem;line-height:1.45;margin-bottom:15px}.auth-card input{width:100%;margin:5px 0;padding:12px;border:1px solid #e4d8dc;border-radius:12px;font-size:1rem}.auth-card button{width:100%;margin-top:8px;border:0;border-radius:12px;padding:12px;background:var(--deep-pink);color:white;font-weight:800}.auth-error{min-height:20px;color:#a34f63;font-size:.78rem;margin-top:8px}.sync-status{font-size:.72rem;color:var(--gray);margin-top:8px}
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -635,6 +636,16 @@ nav {
 </head>
 
 <body>
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-card">
+    <h2>Taylor's Dashboard</h2>
+    <p>Sign in to keep Taylor's dashboard private and synced across devices. 🩷</p>
+    <input id="authEmail" type="email" autocomplete="username" placeholder="Email">
+    <input id="authPassword" type="password" autocomplete="current-password" placeholder="Password">
+    <button id="authSignIn" type="button">Sign In</button>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
 
 <header class="hero">
 <img src="rapunzel-header.jpg" class="rapunzel-art" alt="">
@@ -655,7 +666,7 @@ nav {
   </div>
 
 </header>
-
+<div class="sync-bar"><button class="sync-btn" id="syncButton" type="button">☁️ Syncing…</button></div>
 <main>
 
 <section class="welcome">
@@ -915,7 +926,48 @@ nav {
 
 </nav>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+const SUPABASE_URL="https://umzggbfeamacpumsmooj.supabase.co";
+const SUPABASE_KEY="sb_publishable_TvNMHsWLIuHWpWO90nI3EQ_87cy-l6m";
+const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let cloudUser=null, cloudReady=false, cloudTimer=null, applyingCloud=false;
+const CLOUD_KEYS=["taylorsDashboardHealthHub","taylorsDashboardWorkMeals","taylorsDashboardMeds","taylorsDashboardTasks","taylorsDashboardDayEvents","taylorsDashboardIdeas"];
+function collectCloudData(){const out={};CLOUD_KEYS.forEach(k=>{try{out[k]=JSON.parse(localStorage.getItem(k)||"null")}catch{out[k]=null}});return out;}
+function setSyncStatus(t){const b=document.getElementById("syncButton");if(b)b.textContent=t;}
+async function pushCloud(){
+ if(!cloudReady||!cloudUser||applyingCloud)return;
+ setSyncStatus("☁️ Syncing…");
+ const {error}=await supabaseClient.from("dashboard_data").upsert({user_id:cloudUser.id,data:collectCloudData(),updated_at:new Date().toISOString()});
+ setSyncStatus(error?"⚠️ Sync problem":"☁️ Synced");
+}
+function queueCloudSync(){if(!cloudReady||applyingCloud)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(pushCloud,350);}
+async function loadCloud(){
+ const {data,error}=await supabaseClient.from("dashboard_data").select("data").eq("user_id",cloudUser.id).maybeSingle();
+ if(error){setSyncStatus("⚠️ Sync problem");return;}
+ if(data?.data){
+   applyingCloud=true;
+   CLOUD_KEYS.forEach(k=>{if(data.data[k]!==undefined&&data.data[k]!==null)localStorage.setItem(k,JSON.stringify(data.data[k]));});
+   applyingCloud=false;
+   location.reload();
+ } else {cloudReady=true;await pushCloud();}
+ cloudReady=true;setSyncStatus("☁️ Synced");
+}
+async function startCloud(user){cloudUser=user;document.getElementById("authOverlay").classList.add("hidden");await loadCloud();}
+document.getElementById("authSignIn").onclick=async()=>{
+ const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;
+ document.getElementById("authError").textContent="";
+ const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+ if(error){document.getElementById("authError").textContent="That sign-in didn't work. Check the email and password and try again.";return;}
+ await startCloud(data.user);
+};
+document.getElementById("authPassword").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("authSignIn").click();});
+document.getElementById("syncButton").onclick=pushCloud;
+supabaseClient.auth.getSession().then(({data})=>{if(data.session?.user)startCloud(data.session.user);else{setSyncStatus("☁️ Sign in to sync");document.getElementById("authOverlay").classList.remove("hidden");}});
+supabaseClient.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_OUT"){cloudReady=false;cloudUser=null;document.getElementById("authOverlay").classList.remove("hidden");}});
+const originalSetItem=Storage.prototype.setItem;
+Storage.prototype.setItem=function(key,value){originalSetItem.call(this,key,value);if(this===localStorage&&CLOUD_KEYS.includes(key))queueCloudSync();};
+
 const now = new Date();
 
 const date = now.toLocaleDateString("en-US", {
